@@ -78,7 +78,7 @@ public class DataRetriever {
         }
     }
 
-    VoteSummary ComputeVoteSummary() {
+    VoteSummary computeVoteSummary() {
         DbConnection dbConnection = new DbConnection();
         String query = """
                 select count (
@@ -113,7 +113,7 @@ public class DataRetriever {
         }
     }
 
-    double ComputeTurnoutRate(){
+    double computeTurnoutRate(){
         DbConnection dbConnection = new DbConnection();
         String query = """
                 select (count(vote.id)/count(voter.id))*100 as rate from vote
