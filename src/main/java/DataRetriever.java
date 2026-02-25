@@ -59,7 +59,7 @@ public class DataRetriever {
                 from vote v
                 right join candidate c
                 on c.id = v.candidate_id
-                where v.vote_type = 'VALID'
+                and v.vote_type = 'VALID'
                 group by c.name;
         """;
         try (Connection conn = dbConnection.getConnection()){
@@ -74,6 +74,91 @@ public class DataRetriever {
             }
             return candidateVoteCounts;
         } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    VoteSummary ComputeVoteSummary() {
+        DbConnection dbConnection = new DbConnection();
+        String query = """
+                select count (
+                    case when v.vote_type = 'VALID'
+                       then 1
+                       end
+                ) as valid_count,
+                    count(
+                        case when v.vote_type = 'NULL'
+                        then 1
+                        end
+                    ) as null_count,
+                    count(
+                        case when v.vote_type = 'BLANK'
+                        then 1
+                        end
+                    ) as blank_count
+                from vote v;
+        """;
+        try (Connection conn = dbConnection.getConnection()){
+            PreparedStatement preparedStatement = conn.prepareStatement(query);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            VoteSummary voteSummary = new VoteSummary();
+            while (resultSet.next()) {
+                voteSummary.setBlankCount(resultSet.getInt("blank_count"));
+                voteSummary.setValidCount(resultSet.getInt("valid_count"));
+                voteSummary.setNullCount(resultSet.getInt("null_count"));
+            }
+            return voteSummary;
+        }catch (SQLException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    double ComputeTurnoutRate(){
+        DbConnection dbConnection = new DbConnection();
+        String query = """
+                select (count(vote.id)/count(voter.id))*100 as rate from vote
+                cross join voter
+        """;
+        try (Connection conn = dbConnection.getConnection()){
+            PreparedStatement preparedStatement = conn.prepareStatement(query);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            double turnoutRate = 0;
+            while (resultSet.next()) {
+                turnoutRate = resultSet.getDouble("rate");
+            }
+            return turnoutRate;
+        }catch (SQLException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    ElectoinResult findWinner(){
+        DbConnection dbConnection = new DbConnection();
+        String query = """
+                with valid_by_candidate as (
+                select c.name,
+                    count (
+                        v.id
+                    ) as cnt
+                    from vote v
+                    join candidate c
+                    on c.id = v.candidate_id
+                    and v.vote_type = 'VALID'
+                    group by c.name
+                ) select name, cnt as count
+                from valid_by_candidate
+                where cnt = (select max(cnt) from valid_by_candidate)
+        """;
+        try (Connection connection = dbConnection.getConnection()){
+            PreparedStatement preparedStatement = connection.prepareStatement(query);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            ElectoinResult electoinResult = new ElectoinResult();
+            while (resultSet.next()) {
+                electoinResult.setValidVoteCount(resultSet.getInt("count"));
+                electoinResult.setCandidateName(resultSet.getString("name"));
+            }
+            return electoinResult;
+        }catch (SQLException e){
             throw new RuntimeException(e);
         }
     }
